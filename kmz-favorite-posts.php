@@ -12,3 +12,16 @@
  * Text Domain: kmz-favorite-posts
  * Domain Path: /languages
 */
+
+/**
+ * Add button before content single post for logged users
+ */
+function kamuz_favorites_content( $content ) {
+    if( !is_single() || !is_user_logged_in() ) {
+        return $content;
+    }
+    else {
+        return '<p class="favorite-links add-to-favorite"><a href="#">Add to Favorite</a></p>' . $content;
+    }
+}
+add_filter( 'the_content', 'kamuz_favorites_content' );
