@@ -23,6 +23,8 @@ add_filter( 'the_content', 'kmz_favorites_content' );
 
 ## Подключение CSS и JavaScript
 
+Нам нужно загружать CSS и JavaScript файлы только для страниц блога и только для авторизированных пользователей, поэтому внутри функции мы сделаем проверку.
+
 ```php
 function kmz_favorite_css_js() {
     if( is_single() || is_user_logged_in() ){
@@ -56,4 +58,67 @@ jQuery(document).ready(function($){
         console.log("Clicked! You are the best WordPress Developer...");
     });
 });
+```
+
+## Отправляем AJAX запрос
+
+Порядок того что мы делаем в нашем скрипте:
+
+* Отменяем дефолтное поведение по клику на нашу кнопку с помощью метода `preventDefault()`
+* Используем метод `ajax()` и передаём необходимые параметры для AJAX запроса:
+    * `type:` - данные будут передаваться методом `POST`
+    * `url:` - файл, куда будут отправленны данные. Пока что мы запишем этот адрес в ручную `wp-admin/admin-ajax.php`, а потом мы это поменяем
+    * `data:` - данные, которые мы будем отправлять. Пока что мы просто отправим данные для теста. Кроме этого нам нужно указать ещё один параметр `{action}`, который и свяжет наш AJAX запрос с нужным нам хуком и нужной функцией соотвественно.
+    * `success:` - ответ, который прийдёт в случае успешной отправки AJAX запроса. Создаём функцию, в которую передадим результат AJAX запроса, который мы внутрий функции пока что просто выведем в консоль.
+    * `error:` - выводим сообщение, если во время запроса произвойдёт какая-то ошибка
+
+*wp-content/plugins/kmz-favorite-posts/js/script.js*
+
+```js
+jQuery(document).ready( function($) {
+    $('p.favorite-links > a').click(function(e){
+        e.preventDefault();
+        $.ajax({
+            type: 'POST',
+            url: '/wp-admin/admin-ajax.php',
+            data: {
+                test: 'Test data',
+                action: 'kmz_add_favorite'
+            },
+            success: function(res){
+                console.log(res);
+            },
+            error: function(){
+                alert("Error AJAX");
+            }
+        });
+    });
+});
+```
+
+Теперь мы должны принять наш запрос в файле *wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*. Мы будем принимать запрос только от авторизированных пользователей, поэтому будем применять `wp_ajax_{action}`. Вместо `{action}` мы указываем то же значение что мы указывали в параметре `action:` в нашем скрипте. Таким образом, когда мы будем отправлять AJAX запрос, он отправляется в файле *wp-admin/admin-ajax.php*, в котором используется передаваемый `action:`, после чего разыскивается соотвественный хук с динамическим экшеном `wp_ajax_kmz_add_favorite`, после чего запрос попадает в функцию, которую мы повесили на наш хук - можно её назвать точно также как и хук, главное чтобы имя этой функции было уникальным.
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_add_favorite(){
+    if(isset($_POST)){
+        print_r($_POST);
+    }
+    wp_die('AJAX request completed!');
+}
+add_action( 'wp_ajax_kmz_add_favorite', 'kmz_add_favorite' );
+```
+
+Мы отправляем данные методом `POST`, поэтому как минимум в данном массиве должны находится наши данные, поэтому мы проверяем если POST данные существуют, то мы пока что их просто распечатаем. После этого мы должны завершить работу скрипта, для этого мы будем используем функцию `wp_die()`, которая фактически является обвёрткой стандарной функции PHP `die()`;
+
+Если вы всё написали правильно, то в итоге должны получить примерно такой результат в консоли после клика на кнопку **Add to Favorite**:
+
+```php
+Array
+(
+    [test] => Test data
+    [action] => kamuz_add
+)
+AJAX request complete!
 ```

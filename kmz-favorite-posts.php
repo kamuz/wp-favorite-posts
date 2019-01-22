@@ -36,3 +36,14 @@ function kmz_favorite_css_js() {
     }
 }
 add_action( 'wp_enqueue_scripts', 'kmz_favorite_css_js' );
+
+/**
+ * AJAX request to add post to favorite
+ */
+function kmz_add_favorite(){
+    if(isset($_POST)){
+        print_r($_POST);
+    }
+    wp_die('AJAX request completed!');
+}
+add_action( 'wp_ajax_kmz_add_favorite', 'kmz_add_favorite' );
