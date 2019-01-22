@@ -16,7 +16,7 @@
 /**
  * Add button before content single post for logged users
  */
-function kamuz_favorites_content( $content ) {
+function kmz_favorites_content( $content ) {
     if( !is_single() || !is_user_logged_in() ) {
         return $content;
     }
@@ -24,4 +24,15 @@ function kamuz_favorites_content( $content ) {
         return '<p class="favorite-links add-to-favorite"><a href="#">Add to Favorite</a></p>' . $content;
     }
 }
-add_filter( 'the_content', 'kamuz_favorites_content' );
+add_filter( 'the_content', 'kmz_favorites_content' );
+
+/**
+ * Add CSS and JavaScript
+ */
+function kmz_favorite_css_js() {
+    if( is_single() || is_user_logged_in() ){
+        wp_enqueue_style( 'kmz-favorite-style', plugins_url('/css/style.css', __FILE__), null, '1.0.0', 'screen' );
+        wp_enqueue_script( 'kmz-favorite-script', plugins_url('/js/script.js', __FILE__), array( 'jquery' ), '1.0.0', true);
+    }
+}
+add_action( 'wp_enqueue_scripts', 'kmz_favorite_css_js' );

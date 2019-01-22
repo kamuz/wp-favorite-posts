@@ -1,0 +1,5 @@
+.single p.favorite-links a{
+    text-decoration: none;
+    box-shadow: none;
+    border-bottom: 2px dotted indianred;
+}
