@@ -4,7 +4,7 @@
 
 Добавим ссылку **Добавить в избранное** с помощью фильтра. При этом мы должны сделать проверку, чтобы ссылка добавлялась только для материалов (content post type) с типом статьи и чтобы она отображалась только для авторизированных пользователей.
 
-*wp-content/plugins/kamuz-favorite-posts/kamuz-favorite-posts.php*
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
 
 ```php
 function kmz_favorites_content( $content ) {
@@ -114,11 +114,11 @@ add_action( 'wp_ajax_kmz_add_favorite', 'kmz_add_favorite' );
 
 Если вы всё написали правильно, то в итоге должны получить примерно такой результат в консоли после клика на кнопку **Add to Favorite**:
 
-```php
+```
 Array
 (
     [test] => Test data
-    [action] => kamuz_add
+    [action] => kmz_add
 )
 AJAX request complete!
 ```
@@ -129,7 +129,7 @@ AJAX request complete!
 
 Первый параметр - это идентификатор скрипта, для которого мы передаём наши данные, второй параметр - это имя объекта в котором мы будем хранить наши данные, третий параметр - это сами данные, которые передаются в виде массива, где ключ это свойства передаваемого объекта, а значение - это сами данные и в данном случае это будет у нас путь к файлу *wp-admin/admin-ajax.php*. В `url` мы передадим путь к админке используя функцию `admin_url()`, на вход которой передадим путь к нашему файлу `admin-ajax.php`.
 
-*wp-content/plugins/kmz-favorite-posts/functions.php*
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
 
 ```php
 function kmz_favorite_css_js() {
@@ -144,9 +144,9 @@ function kmz_favorite_css_js() {
 }
 ```
 
-Теперь после обновления страницы в исходном коде мы можем обнаружить нашу переменную `var kamuzFavorites = {"url":"http:\/\/wordpress.loc\/wp-admin\/admin-ajax.php"};` - таким образом мы получили полный абсолютный путь к файлу *admin-ajax.php*.
+Теперь после обновления страницы в исходном коде мы можем обнаружить нашу переменную `var kmzFavorites = {"url":"http:\/\/wordpress.loc\/wp-admin\/admin-ajax.php"};` - таким образом мы получили полный абсолютный путь к файлу *admin-ajax.php*.
 
-Теперь для начала можем вывести необходимый нам объект `kamuzFavorites` в консоль:
+Теперь для начала можем вывести необходимый нам объект `kmzFavorites` в консоль:
 
 *wp-content/plugins/kmz-favorite-posts/js/kmz-favorite-script.js*
 
@@ -160,9 +160,9 @@ jQuery(document).ready( function($) {
 });
 ```
 
-Соответсвенно, если нам нужно получить только значение свойства `url` мы должны написать так - `kamuzFavorites.url`.
+Соответсвенно, если нам нужно получить только значение свойства `url` мы должны написать так - `kmzFavorites.url`.
 
-*wp-content/plugins/kamuz-favorite-posts/js/kamuz-favorite-script.js*
+*wp-content/plugins/kmz-favorite-posts/js/kmz-favorite-script.js*
 
 ```js
 jQuery(document).ready( function($) {
@@ -187,3 +187,84 @@ jQuery(document).ready( function($) {
 ```
 
 Таким образом мы сформировали динамический путь.
+
+## Ограничиваем количество нажатий на ссылку, улучшаем безопасность и получаем ID текущего поста
+
+По клику на кнопку у нас будет появляться прелоадер, который будет отображаться в процессе отправки AJAX запроса на сервер, после того как прийдёт ответ от сервера мы будем скрывать этот прелоадер и вместо ссылки будем выводить текст, например **Added to Favorite**.
+
+Для начала находим и перемещаем в папку *img/* gif изображение прелоадера. Далее в функции, которая выводит ссылку добавляем изображение:
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_favorites_content( $content ) {
+    if( !is_single() || !is_user_logged_in() ) {
+        return $content;
+    }
+    else {
+        $img_loader_src = plugins_url( '/img/ajax-loader.gif', __FILE__ );
+        return '<p class="favorite-links add-to-favorite"><a href="#">Add to Favorite</a> <img src="' . $img_loader_src . '" alt="loader" class="hidden"> </p>' . $content;
+    }
+}
+```
+
+Проверяем что изображение успешно выводится и скрываем его в CSS:
+
+*wp-content/plugins/kmz-favorite-posts/css/kmz-favorite-style.css*
+
+```css
+.hidden{
+    display: none;
+}
+```
+
+Теперь нам нужно показывать это изображение-прелоадер, только в тот момент, когда пользователь кликает по ссылке **Add to Favorite**. Для этого в файл со скриптами, где мы пишем код для AJAX запроса добавить новый параметр `beforeSend:` в котором мы напишем функцию, которая будет отображать картинку-прелоадер. После чего мы немного подправим параметр `success:`, где в функции мы будем скрывать прелоадер и ссылку и пока что отображать результат AJAX запроса с помощью функции `html()`, который хранится в переменной `res`.
+
+*wp-content/plugins/kmz-favorite-posts/js/kmz-favorite-script.js*
+
+```js
+jQuery(document).ready( function($) {
+    $('p.favorite-links > a').click(function(e){
+        e.preventDefault();
+        $.ajax({
+            type: 'POST',
+            url: kmzFavorites.url,
+            data: {
+                test: 'Test data',
+                action: 'kmz_add_favorite',
+            },
+            beforeSend: function(){
+                $('p.favorite-links > img').fadeIn();
+            },
+            success: function(res){
+                console.log(res);
+                $('p.favorite-links > img').fadeOut(300, function(){
+                    $('p.favorite-links > a').hide();
+                    $('p.favorite-links').html(res);
+                });
+            },
+            error: function(){
+                alert("Error AJAX");
+            }
+        });
+    });
+});
+```
+
+Теперь нам нужно проверить подлинность AJAX запроса и для этого мы воспользуемся функцией `wp_create_nonce()`, которая создаёт специальный проверочный код и функцию `wp_verify_nonce()`, которая проверяет этот проверочный код.
+
+Функцию `wp_create_nonce()` мы будем передавать в качестве элемента массива третьего параметра функции `wp_localize_script()`. На вход функции `wp_create_nonce()` нам нужно передать секретную строку, на основании которой и генеруется этот проверочный код.
+
+*wp-content/plugins/kmz-favorite-posts/functions.php*
+
+```php
+wp_localize_script( 'kmz-favorite-script', 'kmzFavorites', [ 'url' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'kmz-favorites' )] );
+```
+
+Теперь после обновления страницы в исходном коде мы увидим такое содержимое объекта `kmzFavorites{}`:
+
+```js
+/* <![CDATA[ */
+var kmzFavorites = {"url":"http:\/\/wordpress.loc\/wp-admin\/admin-ajax.php","nonce":"0350847b82"};
+/* ]]> */
+```

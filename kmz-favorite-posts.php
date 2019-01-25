@@ -21,7 +21,8 @@ function kmz_favorites_content( $content ) {
         return $content;
     }
     else {
-        return '<p class="favorite-links add-to-favorite"><a href="#">Add to Favorite</a></p>' . $content;
+        $img_loader_src = plugins_url( '/img/ajax-loader.gif', __FILE__ );
+        return '<p class="favorite-links add-to-favorite"><a href="#">Add to Favorite</a> <img src="' . $img_loader_src . '" alt="loader" class="hidden"> </p>' . $content;
     }
 }
 add_filter( 'the_content', 'kmz_favorites_content' );
@@ -33,7 +34,7 @@ function kmz_favorite_css_js() {
     if( is_single() || is_user_logged_in() ){
         wp_enqueue_style( 'kmz-favorite-style', plugins_url('/css/style.css', __FILE__), null, '1.0.0', 'screen' );
         wp_enqueue_script( 'kmz-favorite-script', plugins_url('/js/script.js', __FILE__), array( 'jquery' ), '1.0.0', true);
-        wp_localize_script( 'kmz-favorite-script', 'kmzFavorites', [ 'url' => admin_url( 'admin-ajax.php' )] );
+        wp_localize_script( 'kmz-favorite-script', 'kmzFavorites', [ 'url' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'kmz-favorites' )] );
     }
 }
 add_action( 'wp_enqueue_scripts', 'kmz_favorite_css_js' );
