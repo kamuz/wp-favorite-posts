@@ -122,3 +122,68 @@ Array
 )
 AJAX request complete!
 ```
+
+## Формируем динамический путь к *wp-admin/admin-ajax.php*
+
+Теперь нам нужно `url:` который мы прописали вручную прописать динамически. Зачем это вообще изменять, тем более что в большинстве случаев такой код будет работать. Дело в том что иногда мы может установить сайт не в корень сервера, а например в подпаку, но наш текущий путь начинается от корня и мы можем получить ошибку, потому что будем обращатся к не существующему файлу. Для того чтобы исправить эту проблему нам нужно использовать функцию `wp_localize_script()`, которая позволяет передать необходимые данные для нашего скрипта. Данную функцию нужно вызывать внутри функции, которая использует хук `wp_enqueue_scripts`.
+
+Первый параметр - это идентификатор скрипта, для которого мы передаём наши данные, второй параметр - это имя объекта в котором мы будем хранить наши данные, третий параметр - это сами данные, которые передаются в виде массива, где ключ это свойства передаваемого объекта, а значение - это сами данные и в данном случае это будет у нас путь к файлу *wp-admin/admin-ajax.php*. В `url` мы передадим путь к админке используя функцию `admin_url()`, на вход которой передадим путь к нашему файлу `admin-ajax.php`.
+
+*wp-content/plugins/kmz-favorite-posts/functions.php*
+
+```php
+function kmz_favorite_css_js() {
+    if( !is_single() || !is_user_logged_in() ) {
+        return $content;
+    }
+    else{
+        wp_enqueue_script( 'kmz-favorite-script', plugins_url('/js/kmz-favorite-script.js', __FILE__), array( 'jquery' ), '1.0.0', true);
+        wp_enqueue_style( 'kmz-favorite-style', plugins_url('/css/kmz-favorite-style.css', __FILE__), null, '1.0.0', 'screen' );
+        wp_localize_script( 'kmz-favorite-script', 'kmzFavorites', [ 'url' => admin_url( 'admin-ajax.php' )] );
+    }
+}
+```
+
+Теперь после обновления страницы в исходном коде мы можем обнаружить нашу переменную `var kamuzFavorites = {"url":"http:\/\/wordpress.loc\/wp-admin\/admin-ajax.php"};` - таким образом мы получили полный абсолютный путь к файлу *admin-ajax.php*.
+
+Теперь для начала можем вывести необходимый нам объект `kamuzFavorites` в консоль:
+
+*wp-content/plugins/kmz-favorite-posts/js/kmz-favorite-script.js*
+
+```js
+jQuery(document).ready( function($) {
+    $('p.favorite-links > a').click(function(e){
+        e.preventDefault();
+        console.log(kmzFavorites);
+        //..
+    });
+});
+```
+
+Соответсвенно, если нам нужно получить только значение свойства `url` мы должны написать так - `kamuzFavorites.url`.
+
+*wp-content/plugins/kamuz-favorite-posts/js/kamuz-favorite-script.js*
+
+```js
+jQuery(document).ready( function($) {
+    $('p.favorite-links > a').click(function(e){
+        e.preventDefault();
+        $.ajax({
+            type: 'POST',
+            url: kmzFavorites.url,
+            data: {
+                test: 'Test data',
+                action: 'kmz_add_favorite',
+            },
+            success: function(res){
+                console.log(res);
+            },
+            error: function(){
+                alert("Error AJAX");
+            }
+        });
+    });
+});
+```
+
+Таким образом мы сформировали динамический путь.

@@ -33,6 +33,7 @@ function kmz_favorite_css_js() {
     if( is_single() || is_user_logged_in() ){
         wp_enqueue_style( 'kmz-favorite-style', plugins_url('/css/style.css', __FILE__), null, '1.0.0', 'screen' );
         wp_enqueue_script( 'kmz-favorite-script', plugins_url('/js/script.js', __FILE__), array( 'jquery' ), '1.0.0', true);
+        wp_localize_script( 'kmz-favorite-script', 'kmzFavorites', [ 'url' => admin_url( 'admin-ajax.php' )] );
     }
 }
 add_action( 'wp_enqueue_scripts', 'kmz_favorite_css_js' );

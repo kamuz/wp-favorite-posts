@@ -3,10 +3,10 @@ jQuery(document).ready( function($) {
         e.preventDefault();
         $.ajax({
             type: 'POST',
-            url: '/wp-admin/admin-ajax.php',
+            url: kmzFavorites.url,
             data: {
                 test: 'Test data',
-                action: 'kmz_add_favorite'
+                action: 'kmz_add_favorite',
             },
             success: function(res){
                 console.log(res);
