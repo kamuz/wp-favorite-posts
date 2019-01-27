@@ -1,12 +1,16 @@
 jQuery(document).ready( function($) {
+    /**
+     * Add/remove post to/from favorites
+     */
     $('p.favorite-links > a').click(function(e){
         e.preventDefault();
+        var action = $(this).data('action');
         $.ajax({
             type: 'POST',
             url: kmzFavorites.url,
             data: {
                 security: kmzFavorites.nonce,
-                action: 'kmz_add_favorite',
+                action: 'kmz_' + action + '_favorite',
                 postId: kmzFavorites.postId,
             },
             // Show loader image
@@ -15,7 +19,6 @@ jQuery(document).ready( function($) {
             },
             // Hide loader image and link and show result
             success: function(res){
-                console.log(res);
                 $('p.favorite-links > img').fadeOut(300, function(){
                     $('p.favorite-links > a').hide();
                     $('p.favorite-links').html(res);

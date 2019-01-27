@@ -371,7 +371,7 @@ function kmz_add_favorite(){
 
 Теперь мы можем добавлять данные в БД и для этого будем использовать функцию `add_user_meta()`. Данная функция в случае успешного добавления информации в БД возвращает ID добавленного поля, в ином случае возвращает `false`, поэтому мы можем использовать это в условии:
 
-*wp-content/plugins/kamuz-favorite-posts/kmz-favorite-posts.php*
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
 
 ```php
 function kmz_add_favorite(){
@@ -389,7 +389,7 @@ function kmz_add_favorite(){
 
 Сейчас данные успешно добавляются в базу данных, но при этом если мы обновим страницу поста, то мы снова сможем добавить уже же статью в БД и при этом уже будет дублирование наших данных в БД. Перед тем как двигаться дальше, добавим несколько статей в изобранное для теста. Чтобы избежать дублирования данных, нам нужно написать отдельную функцию, которая будет проверять не добавлен ли текущая статья в избранное.
 
-*wp-content/plugins/kamuz-favorite-posts/kmz-favorite-posts.php*
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
 
 ```php
 function kmz_is_favorites($post_id){
@@ -402,7 +402,7 @@ function kmz_is_favorites($post_id){
 
 Теперь мы можем вызвать эту функцию чтобы посмотреть возвращаются ли нам данные и вставим её перед тем как добавлять данные в БД.
 
-*wp-content/plugins/kamuz-favorite-posts/kmz-favorite-posts.php*
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
 
 ```php
 function kmz_add_favorite(){
@@ -423,7 +423,7 @@ function kmz_add_favorite(){
 
 Мы получили массив и теперь мы можем пройтись по этому массиву в цикле `foreach` и внутри сравниваем каждый элемент массива с ID нашей текущей статьи и если находим совпадение, тогда будем возвращать `true` то есть такая статья уже есть и нам нужно завершить дальшейшее выполнение функции, а если нет, тогда мы продолжим выполнение программного кода нашей функции и добавим текущую запись в избранное.
 
-*wp-content/plugins/kamuz-favorite-posts/kmz-favorite-posts.php*
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
 
 ```php
 function kmz_add_favorite(){
@@ -455,7 +455,7 @@ function kamuz_is_favorites($post_id){
 
 Теперь осталось сделать чтобы когда статья уже добаленна в избранное отображалась ссылка **Delete from Favorites**. За вывод кнопки у нас отвечает функция `kmz_favorites_content()`. Чтобы внутри использовать проверку с помощью функции `kmz_is_favorites()` нужно передать на вход ID поста, поэтому мы сначала сделаем глобальной переменную `global $post` и потому получим ID текущей страницы `$post->ID`.
 
-*wp-content/plugins/kamuz-favorite-posts/kmz-favorite-posts.php*
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
 
 ```php
 function kmz_favorites_content( $content ) {
@@ -471,4 +471,76 @@ function kmz_favorites_content( $content ) {
         return '<p class="favorite-links add-to-favorite"><a href="#">Add to Favorite</a> <img src="' . $img_loader_src . '" alt="loader" class="hidden"> </p>' . $content;
     }
 }
+```
+
+## Удаление из избранного
+
+Для удаления из избранного мы уже будем использовать `delete_user_meta()`.
+
+Наш существующий AJAX запрос в файле *wp-content/plugins/kmz-favorite-posts/js/script.js* работает только на добавление, соответственно чтобы нам реализовать удаление нам нужно просто его скопировать и поменять `action:`, но при этом мы будем дублировать код, что не является хорошей практикой. Чтобы этого избежать нужно в начале унифицировать ссылки, чтобы исходный код их был одинаковый. Чтобы отличить эти ссылки мы можем добавить новый атбрибут, назовём его к примеру `data-action` и назначим им разные значения этого атрибута, которое мы будем проверять и тем самым будем избегать дублирование кода:
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_favorites_content( $content ) {
+    global $post;
+    $img_loader_src = plugins_url( '/img/ajax-loader.gif', __FILE__ );
+    if ( !is_single() || !is_user_logged_in() ) {
+        return $content;
+    }
+    elseif (kmz_is_favorites($post->ID)){
+        return '<p class="favorite-links remove-favorite"><a href="#" data-action="del">Remove from favorites</a> <img src="' . $img_loader_src . '" alt="loader" class="loader-gif hidden" data-action="del"> </p>' . $content;
+    }
+    else {
+        return '<p class="favorite-links add-to-favorite"><a href="#" data-action="add">Add to Favorite</a> <img src="' . $img_loader_src . '" alt="loader" class="hidden"> </p>' . $content;
+    }
+}
+```
+
+Теперь получим значение атрибута `data` с помощью метода jQuery `data()` и выведем его в консоль:
+
+*wp-content/plugins/kmz-favorite-posts/js/kamuz-favorite-script.js*
+
+```js
+jQuery(document).ready( function($) {
+    $('p.favorite-links > a').click(function(e){
+        e.preventDefault();
+        var action = $(this).data('action');
+        console.log(action);
+        $.ajax({
+        //..
+```
+
+Таким образом по клику на кнопки **Add to Favorites** и **Remove from Favorites** мы будем получать строку либо `add` либо `del` в консоли. Теперь мы можем изменить наш экшен, чтобы он был динамическим:
+
+*wp-content/plugins/kmz-favorite-posts/js/script.js*
+
+```js
+data: {
+    security: kmzFavorites.nonce,
+    action: 'kmz_' + action + '_favorite',
+    postId: kmzFavorites.postId,
+},
+```
+
+Теперь нам осталось сдублировать нашу функцию, которая обрабатывает AJAX запрос. Когда мы используем функцию `kmz_is_favorites()`, то мы уже идём от обратного и завершаем выполнение скрипта в том случае, если этой записи нет в БД. Как уже говорилось ранее для удаления мета данных мы будем использовать функцию `delete_user_meta()`, которой  на вход мы передаём ID пользователя, ключ и значение поля. Значение поля не объязательное и если мы укажем только первые два параметра, тогда будут удаленны все мета данные с определённым ключём для даннного пользователя - это нам пригодится в том случае, когда пользователь пожелает удалит все статьи из избранного.
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_del_favorite(){
+    if(!wp_verify_nonce( $_POST['security'], 'kmz-favorites' )){
+        wp_die("Security error!");
+    }
+    $post_id = (int)$_POST['postId'];
+    $user = wp_get_current_user();
+    if(!kmz_is_favorites($post_id)){
+        wp_die();
+    }
+    if(delete_user_meta( $user->ID, 'kmz_favorites', $post_id )){
+        wp_die('Removed');
+    }
+    wp_die('Error of removing post meta data from the database!');
+}
+add_action( 'wp_ajax_kmz_del_favorite', 'kmz_del_favorite' );
 ```

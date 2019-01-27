@@ -23,10 +23,10 @@ function kmz_favorites_content( $content ) {
         return $content;
     }
     elseif (kmz_is_favorites($post->ID)){
-        return '<p class="remove-favorite"><a href="#">Remove from favorites</a> <img src="' . $img_loader_src . '" alt="loader" class="loader-gif hidden"> </p>' . $content;
+        return '<p class="favorite-links remove-favorite"><a href="#" data-action="del">Remove from favorites</a> <img src="' . $img_loader_src . '" alt="loader" class="loader-gif hidden" data-action="del"> </p>' . $content;
     }
     else {
-        return '<p class="favorite-links add-to-favorite"><a href="#">Add to Favorite</a> <img src="' . $img_loader_src . '" alt="loader" class="hidden"> </p>' . $content;
+        return '<p class="favorite-links add-to-favorite"><a href="#" data-action="add">Add to Favorite</a> <img src="' . $img_loader_src . '" alt="loader" class="hidden"> </p>' . $content;
     }
 }
 add_filter( 'the_content', 'kmz_favorites_content' );
@@ -45,7 +45,7 @@ function kmz_favorite_css_js() {
 add_action( 'wp_enqueue_scripts', 'kmz_favorite_css_js' );
 
 /**
- * AJAX request to add post to favorite
+ * AJAX request for add post to favorite
  */
 function kmz_add_favorite(){
     if(!wp_verify_nonce( $_POST['security'], 'kmz-favorites' )){
@@ -62,6 +62,25 @@ function kmz_add_favorite(){
     wp_die('AJAX request completed!');
 }
 add_action( 'wp_ajax_kmz_add_favorite', 'kmz_add_favorite' );
+
+/**
+ * AJAX request for delete post from favorite
+ */
+function kmz_del_favorite(){
+    if(!wp_verify_nonce( $_POST['security'], 'kmz-favorites' )){
+        wp_die("Security error!");
+    }
+    $post_id = (int)$_POST['postId'];
+    $user = wp_get_current_user();
+    if(!kmz_is_favorites($post_id)){
+        wp_die();
+    }
+    if(delete_user_meta( $user->ID, 'kmz_favorites', $post_id )){
+        wp_die('Removed');
+    }
+    wp_die('Error of removing post meta data from the database!');
+}
+add_action( 'wp_ajax_kmz_del_favorite', 'kmz_del_favorite' );
 
 /**
  * Check in current post is added
