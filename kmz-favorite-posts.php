@@ -31,10 +31,11 @@ add_filter( 'the_content', 'kmz_favorites_content' );
  * Add CSS and JavaScript
  */
 function kmz_favorite_css_js() {
+    global $post;
     if( is_single() || is_user_logged_in() ){
         wp_enqueue_style( 'kmz-favorite-style', plugins_url('/css/style.css', __FILE__), null, '1.0.0', 'screen' );
         wp_enqueue_script( 'kmz-favorite-script', plugins_url('/js/script.js', __FILE__), array( 'jquery' ), '1.0.0', true);
-        wp_localize_script( 'kmz-favorite-script', 'kmzFavorites', [ 'url' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'kmz-favorites' )] );
+        wp_localize_script( 'kmz-favorite-script', 'kmzFavorites', [ 'url' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'kmz-favorites' ), 'postId' => $post->ID] );
     }
 }
 add_action( 'wp_enqueue_scripts', 'kmz_favorite_css_js' );
@@ -43,9 +44,12 @@ add_action( 'wp_enqueue_scripts', 'kmz_favorite_css_js' );
  * AJAX request to add post to favorite
  */
 function kmz_add_favorite(){
-    if(isset($_POST)){
-        print_r($_POST);
+    if(!wp_verify_nonce( $_POST['security'], 'kmz-favorites' )){
+        wp_die("Security error!");
     }
+    echo '<pre>';
+    print_r($_POST);
+    echo '</pre>';
     wp_die('AJAX request completed!');
 }
 add_action( 'wp_ajax_kmz_add_favorite', 'kmz_add_favorite' );

@@ -5,12 +5,15 @@ jQuery(document).ready( function($) {
             type: 'POST',
             url: kmzFavorites.url,
             data: {
-                test: 'Test data',
+                security: kmzFavorites.nonce,
                 action: 'kmz_add_favorite',
+                postId: kmzFavorites.postId,
             },
+            // Show loader image
             beforeSend: function(){
                 $('p.favorite-links > img').fadeIn();
             },
+            // Hide loader image and link and show result
             success: function(res){
                 console.log(res);
                 $('p.favorite-links > img').fadeOut(300, function(){

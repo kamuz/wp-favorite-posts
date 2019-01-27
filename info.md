@@ -188,7 +188,7 @@ jQuery(document).ready( function($) {
 
 Таким образом мы сформировали динамический путь.
 
-## Ограничиваем количество нажатий на ссылку, улучшаем безопасность и получаем ID текущего поста
+## Ограничиваем количество нажатий на ссылку, улучшаем безопасность
 
 По клику на кнопку у нас будет появляться прелоадер, который будет отображаться в процессе отправки AJAX запроса на сервер, после того как прийдёт ответ от сервера мы будем скрывать этот прелоадер и вместо ссылки будем выводить текст, например **Added to Favorite**.
 
@@ -255,7 +255,7 @@ jQuery(document).ready( function($) {
 
 Функцию `wp_create_nonce()` мы будем передавать в качестве элемента массива третьего параметра функции `wp_localize_script()`. На вход функции `wp_create_nonce()` нам нужно передать секретную строку, на основании которой и генеруется этот проверочный код.
 
-*wp-content/plugins/kmz-favorite-posts/functions.php*
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
 
 ```php
 wp_localize_script( 'kmz-favorite-script', 'kmzFavorites', [ 'url' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'kmz-favorites' )] );
@@ -268,3 +268,70 @@ wp_localize_script( 'kmz-favorite-script', 'kmzFavorites', [ 'url' => admin_url(
 var kmzFavorites = {"url":"http:\/\/wordpress.loc\/wp-admin\/admin-ajax.php","nonce":"0350847b82"};
 /* ]]> */
 ```
+
+
+У нас появилось новое свойство `nonce:`, которое мы можем уже использовать в своём скрипте. Теперь вместо свойства `test:` объекта `data{}` мы можем создать свойство `security:`, которому передадим значение свойсва `nonce:` объекта `kmzFavorites{}`.
+
+*wp-content/plugins/kmz-favorite-posts/js/kmz-favorite-script.js*
+
+```
+data: {
+    security: kmzFavorites.nonce,
+    action: 'kmz_add_favorite',
+},
+```
+
+Теперь мы можем проверить совпадает сгенерированный нами код с тем, который мы указали в функции `wp_create_nonce()` - сделать это можно в функции `kmz_add_favorite()`, которую мы прицепили с хуком используя функцию `wp_verify_nonce()`:
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_add_favorite(){
+    if(!wp_verify_nonce( $_POST['security'], 'kmz-favorites' )){
+        wp_die("Security error!");
+    }
+    wp_die("AJAX request complete!");
+}
+```
+
+Функция `wp_verify_nonce()` вернёт `false` если сгенированный код не соответствует строке которую мы передали в функцию `wp_create_nonce()`.
+
+# Получаем ID текущего поста
+
+Теперь нам нужно получить ID текущего поста. В WordPress есть переменная `$post` в которой храняться все данные текущего поста. Так как нам эта переменная нужна внутри функции, где локальная область видимости, нам нужно сделать её глобальной с помощью ключевого слова `global` - таким образом мы получим значение переменной из глобальной области видимости. Переменная `$post` - это объект, который содержит множество свойств, который относятся к текущему посту, нам же нужен только ID.
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+wp_localize_script( 'kmz-favorite-script', 'kmzFavorites', [ 'url' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'kmz-favorites' ), 'postId' => $post->ID] );
+```
+
+Проверим исходный код и содержимое объекта `kmzFavorites{}` - у нас долже появится новое свойство `postId:`. Теперь мы можем это свойство добавить в объект `data:` нашего AJAX запроса:
+
+*wp-content/plugins/kmz-favorite-posts/js/kmz-favorite-script.js*
+
+```js
+data: {
+    security: kmzFavorites.nonce,
+    postId: kmzFavorites.postId,
+    action: kmz_add'
+}
+```
+
+После чего можем вывести на экран весь массив `$_POST`.
+
+*wp-content/plugins/kmz-favorite-posts/functions.php*
+
+```php
+function kmz_add_favorite(){
+    if(!wp_verify_nonce( $_POST['security'], 'kmz-favorites' )){
+        wp_die("Security error!");
+    }
+    echo '<pre>';
+    print_r($_POST);
+    echo '</pre>';
+    wp_die("AJAX request complete!");
+}
+```
+
+Теперь когда мы с помощью AJAX получаем ID текущего поста, мы можем добавлять текущий пост в БД.
