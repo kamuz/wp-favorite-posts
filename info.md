@@ -544,3 +544,5 @@ function kmz_del_favorite(){
 }
 add_action( 'wp_ajax_kmz_del_favorite', 'kmz_del_favorite' );
 ```
+
+test
