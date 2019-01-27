@@ -17,11 +17,15 @@
  * Add button before content single post for logged users
  */
 function kmz_favorites_content( $content ) {
-    if( !is_single() || !is_user_logged_in() ) {
+    global $post;
+    $img_loader_src = plugins_url( '/img/ajax-loader.gif', __FILE__ );
+    if ( !is_single() || !is_user_logged_in() ) {
         return $content;
     }
+    elseif (kmz_is_favorites($post->ID)){
+        return '<p class="remove-favorite"><a href="#">Remove from favorites</a> <img src="' . $img_loader_src . '" alt="loader" class="loader-gif hidden"> </p>' . $content;
+    }
     else {
-        $img_loader_src = plugins_url( '/img/ajax-loader.gif', __FILE__ );
         return '<p class="favorite-links add-to-favorite"><a href="#">Add to Favorite</a> <img src="' . $img_loader_src . '" alt="loader" class="hidden"> </p>' . $content;
     }
 }
@@ -47,9 +51,29 @@ function kmz_add_favorite(){
     if(!wp_verify_nonce( $_POST['security'], 'kmz-favorites' )){
         wp_die("Security error!");
     }
-    echo '<pre>';
-    print_r($_POST);
-    echo '</pre>';
+    $post_id = (int)$_POST['postId'];
+    $user = wp_get_current_user();
+    if(kmz_is_favorites($post_id)){
+        wp_die('Current post is already added');
+    }
+    if(add_user_meta( $user->ID, 'kmz_favorites', $post_id )){
+        wp_die('You post successfully added');
+    }
     wp_die('AJAX request completed!');
 }
 add_action( 'wp_ajax_kmz_add_favorite', 'kmz_add_favorite' );
+
+/**
+ * Check in current post is added
+ */
+
+function kmz_is_favorites($post_id){
+    $user = wp_get_current_user();
+    $favorites = get_user_meta( $user->ID, 'kmz_favorites' );
+    foreach($favorites as $favorite){
+        if($favorite == $post_id){
+            return true;
+        }
+    }
+    return false;
+}

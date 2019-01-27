@@ -137,7 +137,7 @@ function kmz_favorite_css_js() {
         return $content;
     }
     else{
-        wp_enqueue_script( 'kmz-favorite-script', plugins_url('/js/kmz-favorite-script.js', __FILE__), array( 'jquery' ), '1.0.0', true);
+        wp_enqueue_script( 'kmz-favorite-script', plugins_url('/js/script.js', __FILE__), array( 'jquery' ), '1.0.0', true);
         wp_enqueue_style( 'kmz-favorite-style', plugins_url('/css/kmz-favorite-style.css', __FILE__), null, '1.0.0', 'screen' );
         wp_localize_script( 'kmz-favorite-script', 'kmzFavorites', [ 'url' => admin_url( 'admin-ajax.php' )] );
     }
@@ -148,7 +148,7 @@ function kmz_favorite_css_js() {
 
 Теперь для начала можем вывести необходимый нам объект `kmzFavorites` в консоль:
 
-*wp-content/plugins/kmz-favorite-posts/js/kmz-favorite-script.js*
+*wp-content/plugins/kmz-favorite-posts/js/script.js*
 
 ```js
 jQuery(document).ready( function($) {
@@ -162,7 +162,7 @@ jQuery(document).ready( function($) {
 
 Соответсвенно, если нам нужно получить только значение свойства `url` мы должны написать так - `kmzFavorites.url`.
 
-*wp-content/plugins/kmz-favorite-posts/js/kmz-favorite-script.js*
+*wp-content/plugins/kmz-favorite-posts/js/script.js*
 
 ```js
 jQuery(document).ready( function($) {
@@ -220,7 +220,7 @@ function kmz_favorites_content( $content ) {
 
 Теперь нам нужно показывать это изображение-прелоадер, только в тот момент, когда пользователь кликает по ссылке **Add to Favorite**. Для этого в файл со скриптами, где мы пишем код для AJAX запроса добавить новый параметр `beforeSend:` в котором мы напишем функцию, которая будет отображать картинку-прелоадер. После чего мы немного подправим параметр `success:`, где в функции мы будем скрывать прелоадер и ссылку и пока что отображать результат AJAX запроса с помощью функции `html()`, который хранится в переменной `res`.
 
-*wp-content/plugins/kmz-favorite-posts/js/kmz-favorite-script.js*
+*wp-content/plugins/kmz-favorite-posts/js/script.js*
 
 ```js
 jQuery(document).ready( function($) {
@@ -272,7 +272,7 @@ var kmzFavorites = {"url":"http:\/\/wordpress.loc\/wp-admin\/admin-ajax.php","no
 
 У нас появилось новое свойство `nonce:`, которое мы можем уже использовать в своём скрипте. Теперь вместо свойства `test:` объекта `data{}` мы можем создать свойство `security:`, которому передадим значение свойсва `nonce:` объекта `kmzFavorites{}`.
 
-*wp-content/plugins/kmz-favorite-posts/js/kmz-favorite-script.js*
+*wp-content/plugins/kmz-favorite-posts/js/script.js*
 
 ```
 data: {
@@ -308,7 +308,7 @@ wp_localize_script( 'kmz-favorite-script', 'kmzFavorites', [ 'url' => admin_url(
 
 Проверим исходный код и содержимое объекта `kmzFavorites{}` - у нас долже появится новое свойство `postId:`. Теперь мы можем это свойство добавить в объект `data:` нашего AJAX запроса:
 
-*wp-content/plugins/kmz-favorite-posts/js/kmz-favorite-script.js*
+*wp-content/plugins/kmz-favorite-posts/js/script.js*
 
 ```js
 data: {
@@ -320,7 +320,7 @@ data: {
 
 После чего можем вывести на экран весь массив `$_POST`.
 
-*wp-content/plugins/kmz-favorite-posts/functions.php*
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
 
 ```php
 function kmz_add_favorite(){
@@ -335,3 +335,140 @@ function kmz_add_favorite(){
 ```
 
 Теперь когда мы с помощью AJAX получаем ID текущего поста, мы можем добавлять текущий пост в БД.
+
+## Сохранение статьи в БД
+
+`add_user_meta()` - добавляем определённые метаданные к указанному пользователю. На вход подаются несколько параметров, нас же интересуют первые 3 - ID пользователя, ключ мета поля и его значение.
+
+`get_user_meta()` - позволяет получить определённые метаданные (наши статьи). Кроме того нам нужно будет проверять - не добавленна ли данная статья в избранное. На вход мы передаём ID пользователя, ключ метаполя.
+
+`wp_get_current_user()` - получает данные о текущем пользователе, в том числе ID, который мы будем использовать.
+
+Все мета данные хранятся в таблицы `wp_usermeta` хранятся все мета данные пользователя (данные профиля), при этом колонка `user_id` указывает на ID пользователя для которого записанны эти данные.
+
+Для того чтобы тестировать то что мы напрограмируем, нужно создать ещё одного пользователя и авторизироваться в режиме инкогнито.
+
+Мы создадим новый ключ для колонки `meta_key` например `kmz_favorites`, а в качестве значений будем записывать ID статьи, которую сохраняем в избранное.
+
+* Сохраняем текущий ID страницы в переменнюу `$post_id` и приводим её к числу.
+* Сохраняем данные текущем пользователе в переменную `$user` и функции `wp_current_user()`, которая возвращает объект с данными и чтобы в этом убедится мы можем посмотреть эти данные использовав функцию `var_dump()`.
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_add_favorite(){
+    if(!wp_verify_nonce( $_POST['security'], 'kamuz-favorites' )){
+        wp_die("Security error!");
+    }
+    $post_id = (int)$_POST['postId'];
+    $user = wp_get_current_user();
+    echo '<pre>';
+    var_dump($user);
+    echo '</pre>';
+    wp_die("AJAX request complete!");
+}
+```
+
+Теперь мы можем добавлять данные в БД и для этого будем использовать функцию `add_user_meta()`. Данная функция в случае успешного добавления информации в БД возвращает ID добавленного поля, в ином случае возвращает `false`, поэтому мы можем использовать это в условии:
+
+*wp-content/plugins/kamuz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_add_favorite(){
+    if(!wp_verify_nonce( $_POST['security'], 'kamuz-favorites' )){
+        wp_die("Security error!");
+    }
+    $post_id = (int)$_POST['postId'];
+    $user = wp_get_current_user();
+    if(add_user_meta( $user->ID, 'kamuz_favorites', $post_id )){
+        wp_die('You post successfully added');
+    }
+    wp_die('Error of adding new post meta data to the database!');
+}
+```
+
+Сейчас данные успешно добавляются в базу данных, но при этом если мы обновим страницу поста, то мы снова сможем добавить уже же статью в БД и при этом уже будет дублирование наших данных в БД. Перед тем как двигаться дальше, добавим несколько статей в изобранное для теста. Чтобы избежать дублирования данных, нам нужно написать отдельную функцию, которая будет проверять не добавлен ли текущая статья в избранное.
+
+*wp-content/plugins/kamuz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_is_favorites($post_id){
+    $user = wp_get_current_user();
+    $favorites = get_user_meta( $user->ID, 'kmz_favorites' );
+    print_r($favorites);
+    return true;
+}
+```
+
+Теперь мы можем вызвать эту функцию чтобы посмотреть возвращаются ли нам данные и вставим её перед тем как добавлять данные в БД.
+
+*wp-content/plugins/kamuz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_add_favorite(){
+    if(!wp_verify_nonce( $_POST['security'], 'kamuz-favorites' )){
+        wp_die("Security error!");
+    }
+    $post_id = (int)$_POST['postId'];
+    $user = wp_get_current_user();
+    if(kmz_is_favorites($post_id)){
+        wp_die('Current post is already added');
+    }
+    if(add_user_meta( $user->ID, 'kmz_favorites', $post_id )){
+        wp_die('You post successfully added');
+    }
+    wp_die('Error of adding new post meta data to the database!');
+}
+```
+
+Мы получили массив и теперь мы можем пройтись по этому массиву в цикле `foreach` и внутри сравниваем каждый элемент массива с ID нашей текущей статьи и если находим совпадение, тогда будем возвращать `true` то есть такая статья уже есть и нам нужно завершить дальшейшее выполнение функции, а если нет, тогда мы продолжим выполнение программного кода нашей функции и добавим текущую запись в избранное.
+
+*wp-content/plugins/kamuz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_add_favorite(){
+    if(!wp_verify_nonce( $_POST['security'], 'kamuz-favorites' )){
+        wp_die("Security error!");
+    }
+    $post_id = (int)$_POST['postId'];
+    $user = wp_get_current_user();
+    if(kamuz_is_favorites($post_id)){
+        wp_die();
+    }
+    if(add_user_meta( $user->ID, 'kamuz_favorites', $post_id )){
+        wp_die('You post successfully added');
+    }
+    wp_die('Error of adding new post meta data to the database!');
+}
+
+function kamuz_is_favorites($post_id){
+    $user = wp_get_current_user();
+    $favorites = get_user_meta( $user->ID, 'kamuz_favorites' );
+    foreach($favorites as $favorite){
+        if($favorite == $post_id){
+            return true;
+        }
+    }
+    return false;
+}
+```
+
+Теперь осталось сделать чтобы когда статья уже добаленна в избранное отображалась ссылка **Delete from Favorites**. За вывод кнопки у нас отвечает функция `kmz_favorites_content()`. Чтобы внутри использовать проверку с помощью функции `kmz_is_favorites()` нужно передать на вход ID поста, поэтому мы сначала сделаем глобальной переменную `global $post` и потому получим ID текущей страницы `$post->ID`.
+
+*wp-content/plugins/kamuz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_favorites_content( $content ) {
+    global $post;
+    $img_loader_src = plugins_url( '/img/ajax-loader.gif', __FILE__ );
+    if ( !is_single() || !is_user_logged_in() ) {
+        return $content;
+    }
+    elseif (kmz_is_favorites($post->ID)){
+        return '<p class="remove-favorite"><a href="#">Remove from favorites</a> <img src="' . $img_loader_src . '" alt="loader" class="loader-gif hidden"> </p>' . $content;
+    }
+    else {
+        return '<p class="favorite-links add-to-favorite"><a href="#">Add to Favorite</a> <img src="' . $img_loader_src . '" alt="loader" class="hidden"> </p>' . $content;
+    }
+}
+```
