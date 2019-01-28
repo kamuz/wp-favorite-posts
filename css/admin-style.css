@@ -1,0 +1,12 @@
+#kmz_favorites_dashboard .dashicons.dashicons-no{
+    color: #82878c;
+    outline: none;
+}
+#kmz_favorites_dashboard .dashicons.dashicons-no:hover{
+    color: red;
+}
+#kmz_favorites_dashboard .loader-gif{
+    position: relative;
+    top: 3px;
+    left: 3px;
+}

@@ -688,3 +688,216 @@ function kmz_show_dashboard_widget(){
     }
 }
 ```
+
+## Удаление из избранного в виджете
+
+Теперь нам нужно добавить элемент `span` внутри которого будет ссылка по клику на которую будет выполняться AJAX запрос на сервер. Внутри ссылки мы добавим атрибут `data-post` внутри которого у нас будет выводиться ID статьи, который у нас находится в переменной `$favorite`. Иконку для удаления мы возьмём из [стандарных иконок](https://developer.wordpress.org/resource/dashicons/#no), который идут вместе с WordPress.
+
+Также нам понадобится наше изображение лоадер, который мы просто скопируем с уже имеющеющего кода, при этом не забываем также скопировать переменную `$img_loader_src`.
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_show_dashboard_widget(){
+    $user = wp_get_current_user();
+    $favorites = get_user_meta( $user->ID, 'kmz_favorites' );
+    if(!$favorites){
+        echo "You don't have favorite posts yet!";
+    }
+    else{
+        $img_loader_src = plugins_url( '/img/ajax-loader.gif', __FILE__ );
+        echo '<ul>';
+        foreach($favorites as $favorite){
+            echo '<li><a href="' . get_the_permalink( $favorite ) . '" target="_blank">' . get_the_title($favorite) . '</a><span><a href="#" data-post="' . $favorite . '" class="dashicons dashicons-no"></a></span><img src="' . $img_loader_src . '" alt="loader" class="loader-gif hidden"> </li>';
+        }
+        echo '</ul>';
+    }
+}
+```
+
+Кроме этого тот файл стилей, который мы подключали ранее будет работать только в пользовательской части сайта, а в админке он будет не доступен. Для подключения пользовательского файла стилей нужно уже использовать другой экшн `admin_enqueue_scripts`, который удобен тем, что мы можем подключать стили или скрипты к какой-то определённой странице и в нашем случае мы хотим подключить только для главной страницы админки.
+
+Создадим нашу функцию и передадим параметр `$hook`, который затем распечатаем, чтобы посмотреть что он нам возвратит.
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_favorite_admin_scripts($hook) {
+    var_dump($hook);
+}
+add_action( 'admin_enqueue_scripts', 'kmz_favorite_admin_scripts' );
+```
+
+При обновлении страницы вывелась какая строка, а потом всё перекрыла админка, но если перейти в исходный код, то мы увидим:
+
+```plain
+string(9) "index.php"
+```
+
+Если мы перейдём на другую страницу в админке, то этот параметр уже будет возвращать другое значение. То есть в параметре `$hook` у нас находится адрес скрипта, таким образом в условии мы можем провить какое именно значение находится внутри данного параметра и если это `index.php`, тогда мы будем подключать наши скрипты и стили, а если что-то другое, то мы завершим выполнение данной функции. Давайте попробует пока что просто выводить `alert()` если мы на главной странице админки:
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_favorite_admin_scripts($hook) {
+    if($hook != 'index.php'){
+        return;
+    }
+    else{
+        echo '<script>alert("Hello, Admin");</script>';
+    }
+}
+```
+
+Теперь по аналогии как мы делали ранее подключаем файл стилей и скриптов:
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_favorite_admin_scripts($hook) {
+    if($hook != 'index.php'){
+        return;
+    }
+    else{
+        wp_enqueue_script( 'kmz-favorite-admin-script', plugins_url('/js/admin-script.js', __FILE__), array( 'jquery' ), '1.0.0', true);
+        wp_enqueue_style( 'kmz-favorite-admin-style', plugins_url('/css/admin-style.css', __FILE__), null, '1.0.0', 'screen' );
+    }
+}
+```
+
+Создадаём соответствующие файлы в пользовательской папке с нашим плагином и можем добавить туда какой-то код, чтобы проверить что они подключились корректно и мы ничего не напутали с путями.
+
+*wp-content/plugins/kmz-favorite-posts/css/admin-style.css*
+
+```css
+#kmz_favorites_dashboard .dashicons.dashicons-no{
+    color: #82878c;
+    outline: none;
+}
+#kmz_favorites_dashboard .dashicons.dashicons-no:hover{
+    color: red;
+}
+#kmz_favorites_dashboard .loader-gif{
+    position: relative;
+    top: 3px;
+    left: 3px;
+}
+```
+
+*wp-content/plugins/kmz-favorite-posts/js/admin-script.js*
+
+```js
+console.log("Test Admin Widget JS");
+```
+
+Ранее мы получали ID поста через глобальную переменную `global $post` - сейчас же мы мы будем брать его из атрибута `data-post`.
+
+Нам также потребуются данные для локализации (безопасность AJAX) - мы можем просто скопировать данный фрагмент кода и лишнее удалим. К примеру нам уже не нужно указывать параметр `url`, который ссылался на файл `wp-admin/admin-ajax.php` и если мы перейдём исходный код админки, то мы увидим что у нас уже определенна переменная `var ajaxurl = '/wp-admin/admin-ajax.php'`, которая и ведёт на обработчик, а пользовательской части этого по умолчанию нет. В итоге у нас получилось следующее:
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_favorite_admin_scripts($hook) {
+    if($hook != 'index.php'){
+        return;
+    }
+    else{
+        wp_enqueue_script( 'kmz-favorite-admin-script', plugins_url('/js/admin-script.js', __FILE__), array( 'jquery' ), '1.0.0', true);
+        wp_enqueue_style( 'kmz-favorite-admin-style', plugins_url('/css/kmz-favorite-admin-style.css', __FILE__), null, '1.0.0', 'screen' );
+        wp_localize_script( 'kmz-favorite-admin-script', 'kmzFavorites', [ 'nonce' => wp_create_nonce( 'kmz-favorites' ) ] );
+    }
+}
+```
+
+Обновим страницу и перейдём в исходный код чтобы найти переменную `var kmzFavorites`, которая должна иметь примерно следующий вид - `var kmzFavorites = {"nonce":"4a2d730896"};`.
+
+Напишем в скрипте базовый код, который будет обрабатывать событие клика по нашей кнопке:
+
+*wp-content/plugins/kmz-favorite-posts/js/admin-script.js*
+
+```js
+jQuery(document).ready(function($){
+    $('#kmz_favorites_dashboard .dashicons.dashicons-no').click(function(e){
+        e.preventDefault();
+        if(!confirm("Do you really want to delete this post?")) return;
+        console.log("Hello, Admin AJAX");
+    })
+});
+```
+
+С помощью `confirm()` мы просто уточим у пользователя действительно ли он хочет удалить этот пост при этом используем обратное отрицание, если вернётся `false` то есть клик по кнопке **Canсel**, то мы завершаем выполнение скрипта.
+
+Теперь нам потребуется:
+
+* ID поста, который содержится в атрибуте `data-post` и в этом нам поможет метод jQuery `data()`
+* Элемент `span`, то есть родитель того элемента по которому был произведён клик, для того чтобы скрыть сам крестик для этой цели будем использовать метод `parent()`, который вернёт родительский элемент
+* Лоадер для того чтобы его показать и для этого мы используем метода `next()`, который вернёт следующий элемент
+* Родитель элемента `span` - элемент `li` и для того чтобы удалить определённую статью с списка изобранного, мы применим метод `closest()` который вернёт ближайший родитель с указанным селектором.
+
+То есть нам потребуется в общем счёте 4 переменных чтобы было удобно в дальнейшем работать с кодом - создадим их и выведем в консоль, чтобы быть уверенем что возвращаются требуемые нам данные по клику.
+
+*wp-content/plugins/kmz-favorite-posts/js/admin-script.js*
+
+```js
+jQuery(document).ready(function($){
+    $('#kmz_favorites_dashboard .dashicons.dashicons-no').click(function(e){
+        e.preventDefault();
+        if(!confirm("Do you really want to delete this post?")) return;
+        var postId = $(this).data('post'),
+            parent = $(this).parent(),
+            loader = parent.next(),
+            li = $(this).closest('li');
+        console.log(postId);
+        console.log(parent);
+        console.log(loader);
+        console.log(li);
+    })
+});
+```
+
+Чтобы не писать AJAX запрос с самого начала мы скопируем ранее созданные и подправим его под наши нужды.
+
+* Нам нужно изменить параметр `url` - ранее мы локализовали данные и мы обращались к соответсвующему свойству `url` объекта `kmzFavorites`, сейчас же для админской части у нас уже доступна переменная `ajaxurl` которую мы можем использовать. Чтобы проверить перейдите в исходный код и найдите переменную `ajaxurl`.
+* ID поста для свойства `postId` теперь у нас содержится в недавно нами созданной переменной `postId`
+* `action` у нас теперь будет только один, поэтому ставим `kmz_del`
+* В функции `beforeSend:` мы должны скрыть крестик и показать лоадер
+* В функции `success:` мы скрываем лоадер и в элемент `li` выводим ответ
+
+*wp-content/plugins/kmz-favorite-posts/js/admin-script.js*
+
+```js
+jQuery(document).ready(function ($) {
+    $('#kmz_favorites_dashboard .dashicons.dashicons-no').click(function (e) {
+        e.preventDefault();
+        if (!confirm("Do you really want to delete this post?")) return;
+        var postId = $(this).data('post'),
+            parent = $(this).parent(),
+            loader = parent.next(),
+            li = $(this).closest('li');
+        $.ajax({
+            type: 'POST',
+            url: ajaxurl,
+            data: {
+                security: kmzFavorites.nonce,
+                postId: postId,
+                action: 'kmz_del_favorite'
+            },
+            beforeSend: function(){
+                parent.fadeOut(300, function() {
+                    loader.fadeIn();
+                });
+            },
+            success: function(res){
+                loader.fadeOut(300, function(){
+                    li.html(res);
+                });
+            },
+            error: function(){
+                alert("Error AJAX");
+            }
+        });
+    })
+});
+```
+
+Наш AJAX запрос будет обрабатываться тот же функцией что мы создали ранее `kmz_del_favorite()`, так что повторно ничего писать уже не нужно.

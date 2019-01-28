@@ -4,7 +4,9 @@ jQuery(document).ready( function($) {
      */
     $('p.favorite-links > a').click(function(e){
         e.preventDefault();
+        // Get action name from data-action attribute
         var action = $(this).data('action');
+        // Setup AJAX
         $.ajax({
             type: 'POST',
             url: kmzFavorites.url,

@@ -45,7 +45,7 @@ function kmz_favorite_css_js() {
 add_action( 'wp_enqueue_scripts', 'kmz_favorite_css_js' );
 
 /**
- * AJAX request for add post to favorite
+ * Function for AJAX request for add post to favorite
  */
 function kmz_add_favorite(){
     if(!wp_verify_nonce( $_POST['security'], 'kmz-favorites' )){
@@ -64,7 +64,7 @@ function kmz_add_favorite(){
 add_action( 'wp_ajax_kmz_add_favorite', 'kmz_add_favorite' );
 
 /**
- * AJAX request for delete post from favorite
+ * Function for AJAX request for delete post from favorite
  */
 function kmz_del_favorite(){
     if(!wp_verify_nonce( $_POST['security'], 'kmz-favorites' )){
@@ -111,10 +111,26 @@ function kmz_show_dashboard_widget(){
         echo "You don't have favorite posts yet!";
     }
     else{
+        $img_loader_src = plugins_url( '/img/ajax-loader.gif', __FILE__ );
         echo '<ul>';
         foreach($favorites as $favorite){
-            echo '<li><a href="' . get_the_permalink( $favorite ) . '" target="_blank">' . get_the_title($favorite) . '</a></li>';
+            echo '<li><a href="' . get_the_permalink( $favorite ) . '" target="_blank">' . get_the_title($favorite) . '</a><span><a href="#" data-post="' . $favorite . '" class="dashicons dashicons-no"></a></span><img src="' . $img_loader_src . '" alt="loader" class="loader-gif hidden"> </li>';
         }
         echo '</ul>';
     }
 }
+
+/**
+ * Add files of JS scripts and CSS styles to admin section
+ */
+function kmz_favorite_admin_scripts($hook) {
+    if($hook != 'index.php'){
+        return;
+    }
+    else{
+        wp_enqueue_script( 'kmz-favorite-admin-script', plugins_url('/js/admin-script.js', __FILE__), array( 'jquery' ), '1.0.0', true);
+        wp_enqueue_style( 'kmz-favorite-admin-style', plugins_url('/css/admin-style.css', __FILE__), null, '1.0.0', 'screen' );
+        wp_localize_script( 'kmz-favorite-admin-script', 'kmzFavorites', [ 'nonce' => wp_create_nonce( 'kmz-favorites' ) ] );
+    }
+}
+add_action( 'admin_enqueue_scripts', 'kmz_favorite_admin_scripts' );
