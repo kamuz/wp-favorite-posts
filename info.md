@@ -357,7 +357,7 @@ function kmz_add_favorite(){
 
 ```php
 function kmz_add_favorite(){
-    if(!wp_verify_nonce( $_POST['security'], 'kamuz-favorites' )){
+    if(!wp_verify_nonce( $_POST['security'], 'kmz-favorites' )){
         wp_die("Security error!");
     }
     $post_id = (int)$_POST['postId'];
@@ -375,12 +375,12 @@ function kmz_add_favorite(){
 
 ```php
 function kmz_add_favorite(){
-    if(!wp_verify_nonce( $_POST['security'], 'kamuz-favorites' )){
+    if(!wp_verify_nonce( $_POST['security'], 'kmz-favorites' )){
         wp_die("Security error!");
     }
     $post_id = (int)$_POST['postId'];
     $user = wp_get_current_user();
-    if(add_user_meta( $user->ID, 'kamuz_favorites', $post_id )){
+    if(add_user_meta( $user->ID, 'kmz_favorites', $post_id )){
         wp_die('You post successfully added');
     }
     wp_die('Error of adding new post meta data to the database!');
@@ -406,7 +406,7 @@ function kmz_is_favorites($post_id){
 
 ```php
 function kmz_add_favorite(){
-    if(!wp_verify_nonce( $_POST['security'], 'kamuz-favorites' )){
+    if(!wp_verify_nonce( $_POST['security'], 'kmz-favorites' )){
         wp_die("Security error!");
     }
     $post_id = (int)$_POST['postId'];
@@ -427,23 +427,23 @@ function kmz_add_favorite(){
 
 ```php
 function kmz_add_favorite(){
-    if(!wp_verify_nonce( $_POST['security'], 'kamuz-favorites' )){
+    if(!wp_verify_nonce( $_POST['security'], 'kmz-favorites' )){
         wp_die("Security error!");
     }
     $post_id = (int)$_POST['postId'];
     $user = wp_get_current_user();
-    if(kamuz_is_favorites($post_id)){
+    if(kmz_is_favorites($post_id)){
         wp_die();
     }
-    if(add_user_meta( $user->ID, 'kamuz_favorites', $post_id )){
+    if(add_user_meta( $user->ID, 'kmz_favorites', $post_id )){
         wp_die('You post successfully added');
     }
     wp_die('Error of adding new post meta data to the database!');
 }
 
-function kamuz_is_favorites($post_id){
+function kmz_is_favorites($post_id){
     $user = wp_get_current_user();
-    $favorites = get_user_meta( $user->ID, 'kamuz_favorites' );
+    $favorites = get_user_meta( $user->ID, 'kmz_favorites' );
     foreach($favorites as $favorite){
         if($favorite == $post_id){
             return true;
@@ -499,7 +499,7 @@ function kmz_favorites_content( $content ) {
 
 Теперь получим значение атрибута `data` с помощью метода jQuery `data()` и выведем его в консоль:
 
-*wp-content/plugins/kmz-favorite-posts/js/kamuz-favorite-script.js*
+*wp-content/plugins/kmz-favorite-posts/js/kmz-favorite-script.js*
 
 ```js
 jQuery(document).ready( function($) {
@@ -545,4 +545,146 @@ function kmz_del_favorite(){
 add_action( 'wp_ajax_kmz_del_favorite', 'kmz_del_favorite' );
 ```
 
-test
+## Добавление виджета в консоли админ-панели и вывод избранных статей в виде ссылок
+
+Для того чтобы добавить виджет в консоль существует специальная функция `wp_add_dashboard_widget()`, которая должна вызываться во время события `wp_dashboard_setup`, то есть когда происходит инициализация консоли. На вход передаются 5 параметров, 3 из которых объязательные - ID виджета (уникальный идентификатор), название виджета (отображаемый заголовок виджета) и функция обратного вызова, которая выводить сам контент виджета.
+
+Для начала повесим хук на событие `wp_dashboard_setup` и опишем нашу функцию, где вызовем `wp_add_dashboard_widget()`, а также добавим колбэк функцию, которая просто будет выводить текстовый статический контент:
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_favorites_dashboard_widget(){
+    wp_add_dashboard_widget( 'kmz_favorites_dashboard', 'Your list of favorite posts', 'kmz_show_dashboard_widget' );
+}
+add_action('wp_dashboard_setup', 'kmz_favorites_dashboard_widget' );
+
+function kmz_show_dashboard_widget(){
+    echo "This this temp content for admin widget";
+}
+```
+
+Этого уже достаточно, чтобы увидеть наш виджет на стартовой странице админ-панели.
+
+* Получим текущего пользователя с помощью `wp_get_current_user()`
+* Получаем все ID статей, которые были добавленны в избранное с помощью `get_user_meta()`
+* Выводим данные на экран
+* Проверяем если у пользователя нет статей в изобранном, тогда выводим сообщение
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_show_dashboard_widget(){
+    $user = wp_get_current_user();
+    $favorites = get_user_meta( $user->ID, 'kmz_favorites' );
+    if(!$favorites){
+        echo "You don't have favorite posts yet!";
+    }
+    else{
+        echo '<pre>';
+        var_dump($favorites);
+        echo '</pre>';
+        return;
+    }
+}
+```
+
+Если вместо `return` использовать функцию `exit()` то у нас не будут выводится остальные виджеты, то есть у нас прекратится выполнение функции `wp_add_dashboard_widget()`.
+
+Сейчас мы можем распечатать список статей с помощью функции `wp_get_posts()` для этого:
+
+* Берём наш массив и делаем его строкой, в которой ID постов будут разделённые запятой используя функцию `implode()`
+* Передаём полученный набор ID в качестве параметра c ключём `include` функции `get_posts()`
+* Используя массив `foreach` выводим заголовки статей:
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_show_dashboard_widget(){
+   $user = wp_get_current_user();
+    $favorites = get_user_meta( $user->ID, 'kmz_favorites' );
+    if(!$favorites){
+        echo "You don't have favorite posts yet!";
+    }
+    else{
+        $str = implode( ',', $favorites);
+        // echo $str;
+        $kmz_posts = get_posts( ['include' => $str] );
+        // var_dump($kmz_posts);
+        echo "<ul>";
+        foreach ($kmz_posts as $kmz_post) {
+            echo '<li><a href="'. $kmz_post->guid . '">' . $kmz_post->post_title . '</a></li>';
+        }
+        echo "</ul>";
+    }
+}
+```
+
+При таком подходе мы можем выводить не только информацию в виде ссылок, а и другие данные.
+
+Но можно использовать альтернативный вариант с использованием цикла и функций `get_the_title()` и `get_the_permalink()`, которым на вход нужно передать ID поста:
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_show_dashboard_widget(){
+    $user = wp_get_current_user();
+    $favorites = get_user_meta( $user->ID, 'kmz_favorites' );
+    if(!$favorites){
+        echo "You don't have favorite posts yet!";
+    }
+    else{
+        $data = [];
+        foreach($favorites as $favorite){
+            $data[$favorite] = [
+                'title' => get_the_title( $favorite ),
+                'link' => get_the_permalink( $favorite )
+            ];
+        }
+        echo '<pre>';
+        print_r($data);
+        echo '</pre>';
+    }
+}
+```
+
+На выходе мы получим примерно такой вывод:
+
+```plain
+Array
+(
+    [4] => Array
+        (
+            [title] => Hello, man
+            [link] => http://wordpress.loc/?p=4
+        )
+
+    [6] => Array
+        (
+            [title] => How are you
+            [link] => http://wordpress.loc/?p=6
+        )
+
+)
+```
+
+Теперь это всё можно вывести в виде списка ссылок:
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_show_dashboard_widget(){
+    $user = wp_get_current_user();
+    $favorites = get_user_meta( $user->ID, 'kmz_favorites' );
+    if(!$favorites){
+        echo "You don't have favorite posts yet!";
+    }
+    else{
+        echo '<ul>';
+        foreach($favorites as $favorite){
+            echo '<li><a href="' . get_the_permalink( $favorite ) . '" target="_blank">' . get_the_title($favorite) . '</a></li>';
+        }
+        echo '</ul>';
+    }
+}
+```

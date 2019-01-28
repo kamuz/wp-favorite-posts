@@ -85,7 +85,6 @@ add_action( 'wp_ajax_kmz_del_favorite', 'kmz_del_favorite' );
 /**
  * Check in current post is added
  */
-
 function kmz_is_favorites($post_id){
     $user = wp_get_current_user();
     $favorites = get_user_meta( $user->ID, 'kmz_favorites' );
@@ -95,4 +94,27 @@ function kmz_is_favorites($post_id){
         }
     }
     return false;
+}
+
+/**
+ * Add dashboard widget
+ */
+function kmz_favorites_dashboard_widget(){
+    wp_add_dashboard_widget( 'kmz_favorites_dashboard', 'Your list of favorite posts', 'kmz_show_dashboard_widget' );
+}
+add_action('wp_dashboard_setup', 'kmz_favorites_dashboard_widget' );
+
+function kmz_show_dashboard_widget(){
+    $user = wp_get_current_user();
+    $favorites = get_user_meta( $user->ID, 'kmz_favorites' );
+    if(!$favorites){
+        echo "You don't have favorite posts yet!";
+    }
+    else{
+        echo '<ul>';
+        foreach($favorites as $favorite){
+            echo '<li><a href="' . get_the_permalink( $favorite ) . '" target="_blank">' . get_the_title($favorite) . '</a></li>';
+        }
+        echo '</ul>';
+    }
 }
