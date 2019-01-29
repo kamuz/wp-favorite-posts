@@ -117,6 +117,7 @@ function kmz_show_dashboard_widget(){
             echo '<li><a href="' . get_the_permalink( $favorite ) . '" target="_blank">' . get_the_title($favorite) . '</a><span><a href="#" data-post="' . $favorite . '" class="dashicons dashicons-no"></a></span><img src="' . $img_loader_src . '" alt="loader" class="loader-gif hidden"> </li>';
         }
         echo '</ul>';
+        echo '<div class="kmz-favorites-del-all"><button class="button button-primary">Delete All</button><img src="' . $img_loader_src . '" alt="loader" class="loader-gif hidden"></div>';
     }
 }
 
@@ -134,3 +135,23 @@ function kmz_favorite_admin_scripts($hook) {
     }
 }
 add_action( 'admin_enqueue_scripts', 'kmz_favorite_admin_scripts' );
+
+/**
+ * Delete all favorite posts from admin widget
+ */
+function kmz_del_all(){
+    if(!wp_verify_nonce( $_POST['security'], 'kmz-favorites' )){
+        wp_die("Security error!");
+    }
+
+    $user = wp_get_current_user();
+
+    if(delete_metadata('user', $user->ID, 'kmz_favorites')){
+        wp_die('List empty');
+    }
+    else{
+        wp_die('Error of deleting');
+    }
+}
+
+add_action( 'wp_ajax_kmz_del_all', 'kmz_del_all' );

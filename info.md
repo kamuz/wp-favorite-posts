@@ -759,7 +759,7 @@ function kmz_favorite_admin_scripts($hook) {
         return;
     }
     else{
-        wp_enqueue_script( 'kmz-favorite-admin-script', plugins_url('/js/admin-script.js', __FILE__), array( 'jquery' ), '1.0.0', true);
+        wp_enqueue_script( 'admin-script', plugins_url('/js/admin-script.js', __FILE__), array( 'jquery' ), '1.0.0', true);
         wp_enqueue_style( 'kmz-favorite-admin-style', plugins_url('/css/admin-style.css', __FILE__), null, '1.0.0', 'screen' );
     }
 }
@@ -802,9 +802,9 @@ function kmz_favorite_admin_scripts($hook) {
         return;
     }
     else{
-        wp_enqueue_script( 'kmz-favorite-admin-script', plugins_url('/js/admin-script.js', __FILE__), array( 'jquery' ), '1.0.0', true);
+        wp_enqueue_script( 'admin-script', plugins_url('/js/admin-script.js', __FILE__), array( 'jquery' ), '1.0.0', true);
         wp_enqueue_style( 'kmz-favorite-admin-style', plugins_url('/css/kmz-favorite-admin-style.css', __FILE__), null, '1.0.0', 'screen' );
-        wp_localize_script( 'kmz-favorite-admin-script', 'kmzFavorites', [ 'nonce' => wp_create_nonce( 'kmz-favorites' ) ] );
+        wp_localize_script( 'admin-script', 'kmzFavorites', [ 'nonce' => wp_create_nonce( 'kmz-favorites' ) ] );
     }
 }
 ```
@@ -901,3 +901,154 @@ jQuery(document).ready(function ($) {
 ```
 
 Наш AJAX запрос будет обрабатываться тот же функцией что мы создали ранее `kmz_del_favorite()`, так что повторно ничего писать уже не нужно.
+
+## Очистить список избранного
+
+Мы создадим кнопку ниже списка избранных постов в виджете в консоли WordPress по клику на которую будет происходить удаление всех избранных записей.
+
+Добавим кнопку **Delete All** и изображение лоадер в функцию:
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_show_dashboard_widget(){
+    $user = wp_get_current_user();
+    $favorites = get_user_meta( $user->ID, 'kmz_favorites' );
+    if(!$favorites){
+        echo "You don't have favorite posts yet!";
+    }
+    else{
+        $img_loader_src = plugins_url( '/img/ajax-loader.gif', __FILE__ );
+        echo '<ul>';
+        foreach($favorites as $favorite){
+            echo '<li><a href="' . get_the_permalink( $favorite ) . '" target="_blank">' . get_the_title($favorite) . '</a><span><a href="#" data-post="' . $favorite . '" class="dashicons dashicons-no"></a></span><img src="' . $img_loader_src . '" alt="loader" class="loader-gif hidden"> </li>';
+        }
+        echo '</ul>';
+        echo '<div class="kmz-favorites-del-all"><button class="button button-primary">Delete All</button><img src="' . $img_loader_src . '" alt="loader" class="loader-gif hidden"></div>';
+    }
+}
+```
+
+В файле скриптов мы обрабатываем клик по кнопке и создаём необходимые переменные:
+
+*wp-content/plugins/kmz-favorite-posts/js/admin-script.js*
+
+```js
+$('.kmz-favorites-del-all button').click(function(e){
+    e.preventDefault();
+    if (!confirm("Do you really want to delete this post?")) return;
+    var current = $(this);
+        loader = current.next();
+        parent = current.parent();
+        list = parent.prev();
+    console.log(loader);
+    console.log(parent);
+    console.log(list);
+});
+```
+
+Скопируем и изменим созданный ранее AJAX запрос
+
+* Меняем `action:` на `kmz_del_all`
+* `postId` нам уже не нужен - мы его убираем
+* Перед отправкой запроса в функции `beforeSend()` мы скрываем кнопку и отображаем лоадер
+* В случае успешного выполнениния AJAX запроса мы скрываем лоадер и выведем ответ с помощью метода `html()`.
+
+*wp-content/plugins/kmz-favorite-posts/js/admin-script.js*
+
+```js
+$('.kmz-favorites-del-all button').click(function(e){
+    e.preventDefault();
+    if (!confirm("Do you really want to delete this post?")) return;
+    var current = $(this);
+        loader = current.next();
+        parent = current.parent();
+        list = parent.prev();
+    $.ajax({
+        type: 'POST',
+        url: ajaxurl,
+        data: {
+            security: kmzFavorites.nonce,
+            action: 'kmz_del_all'
+        },
+        beforeSend: function(){
+            current.fadeOut(300, function() {
+                loader.fadeIn();
+            });
+        },
+        success: function(res){
+            loader.fadeOut(300, function(){
+                parent.html(res);
+            });
+        },
+        error: function(){
+            alert("Error AJAX");
+        }
+    });
+});
+```
+
+Добавляем функцию `kmz_del_all()` в котором пока что просто будем выводить POST данные и завершать выполнение скрипта
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_del_all(){
+    if(!wp_verify_nonce( $_POST['security'], 'kmz-favorites' )){
+        wp_die("Security error!");
+    }
+    print_r($_POST);
+    wp_die();
+}
+
+add_action( 'wp_ajax_kmz_del_all', 'kmz_del_all' );
+```
+
+Если результат выводится, тогда двигаемся дальше. А дальше нам нужно получить текущего пользователя и удалить все метаданные. Ранее мы использовали `delete_user_meta()` которая удаляла одну запись, теперь мы будем использовать `delete_metadata()`, которой необходимо передать:
+
+* `meta_type` - тип объекта с котором мы будем работать, в нашем случае это `user`.
+* `object_id` - ID объекта, в нашем случае это ID пользователя, который у нас имеется в переменной `$user`
+* `meta_key` - название ключа мета данных
+
+Функция `delete_metadata()` возвращает либо `true` в случае успеха, либо `false` в случае неудачи, поэтому мы можем использовать данную функцию в условии.
+
+*wp-content/plugins/kmz-favorite-posts/kmz-favorite-posts.php*
+
+```php
+function kmz_del_all(){
+    if(!wp_verify_nonce( $_POST['security'], 'kmz-favorites' )){
+        wp_die("Security error!");
+    }
+
+    $user = wp_get_current_user();
+
+    if(delete_metadata('user', $user->ID, 'kmz_favorites')){
+        wp_die('List empty');
+    }
+    else{
+        wp_die('Error of deleting');
+    }
+}
+```
+
+Теперь в скрипте нам нужно изменить функцию `success`:
+
+* Если результат запроса возвращает `List empty` тогда выводить этого сообщение и плавно скрываем список постов
+* Иначе выводим во всплывающем окне сообщение в случае неудачи и снова отображаем кнопку **Delete All**.
+
+*wp-content/plugins/kmz-favorite-posts/js/admin-script.js*
+
+```js
+success: function(res){
+    loader.fadeOut(300, function(){
+        if(res == 'List empty'){
+            parent.html(res);
+            list.fadeOut();
+        } else{
+            current.fadeIn();
+            alert(res);
+        }
+        parent.html(res);
+    });
+},
+```
